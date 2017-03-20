@@ -6,7 +6,7 @@ Java implementation of the formalism described in the article "Universal, Unsupe
 
 # uuusa a a jar
 
-[jar](http://grupolys.org/software/UUUSA/samulan-0.1.0.jar)
+Download a standalone version of the jar file [here](http://grupolys.org/software/UUUSA/samulan-0.1.0.jar)
 
 Additional files and manual from the original submission of the paper can be found [here](http://grupolys.org/software/UUUSA/)
 
