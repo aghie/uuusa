@@ -4,23 +4,23 @@ Java implementation of the formalism described in the article "Universal, Unsupe
 
 
 
-# uuusa a a jar
+## Jar
 
 Download a standalone version of the jar file [here](http://grupolys.org/software/UUUSA/samulan-0.1.0.jar)
 
 Additional files and manual from the original submission of the paper can be found [here](http://grupolys.org/software/UUUSA/)
 
 
-# Execution
+## Execution
 
-## Over a raw file
+### Over a raw file
 
 java -Dfile.encoding=UTF-8 -jar -Xmx2g USA_JAR -s EN PATH_SENTIDATA -r PATH_OPERATIONS_XML -i PATH_RAW_TEXT -p PATH_UUUSA_PROPERTIES_FILE -v [true|false]
 
-## Over a CoNLL file
+### Over a CoNLL file
 java -Dfile.encoding=UTF-8 -jar -Xmx2g USA_JAR -s EN PATH_SENTIDATA -r PATH_OPERATIONS_XML -c PATH_PARSED_CONLL -p PATH_UUUSA_PROPERTIES_FILE -v [true|false]
 
-# Prerequisites 
+## Prerequisites 
 
 Java 8
 
