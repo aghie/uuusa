@@ -1,0 +1,113 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.grupolys.samulan</groupId>
+  <artifactId>samulan</artifactId>
+  <version>0.1.1</version>
+  <name>Sentiment Analysis for Multiple Languages</name>
+  
+  <dependencies>
+  
+  	  <dependency>
+	     <groupId>org.grupolys</groupId>
+	  	<artifactId>nlputils</artifactId>
+	  	<version>0.0.1-SNAPSHOT</version>
+	  </dependency>
+	  
+	  <dependency>
+  		<groupId>junit</groupId>
+  		<artifactId>junit</artifactId>
+  		<version>4.6</version>
+  	</dependency>
+  	
+  	<dependency>
+	  <groupId>net.sourceforge.argparse4j</groupId>
+	  <artifactId>argparse4j</artifactId>
+	  <version>0.4.3</version>
+	</dependency>
+	
+    <dependency>
+        <groupId>net.sf.json-lib</groupId>
+        <artifactId>json-lib</artifactId>
+        <version>2.4</version>
+        <classifier>jdk15</classifier>
+    </dependency>
+	
+	<dependency>
+	<groupId>edu.cmu.cs</groupId>
+	<artifactId>ark-tweet-nlp</artifactId>
+	<version>0.3.2</version>
+</dependency>
+
+
+<dependency>
+    <groupId>edu.stanford.nlp</groupId>
+    <artifactId>stanford-corenlp</artifactId>
+    <version>3.5.0</version>
+</dependency>
+
+<dependency>
+	<groupId>org.maltparser</groupId>
+	<artifactId>maltparser</artifactId>
+	<version>1.8.1</version>
+</dependency>
+
+
+<dependency>
+	<groupId>com.github.mdr</groupId>
+	<artifactId>ascii-graphs_2.10</artifactId>
+	<version>0.0.6</version>
+</dependency>
+
+  
+  </dependencies>
+  
+    <build>
+    <plugins>
+  		<plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.1</version>
+            <configuration>
+                <source>1.8</source>
+                <target>1.8</target>
+            </configuration>
+        </plugin>
+        
+        
+   <!--     <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <version>1.2.1</version>
+            <configuration>
+     			<mainClass>es.udc.fi.dc.lys.samulan.Samulan</mainClass>   
+     			<arguments>  
+       				<argument>-d</argument>
+       				<argument>/home/david/Resources/SFU_Spanish_Corpus/SFU_Spanish_Parsed_all_in_one/</argument>   
+        			<argument>-s</argument>
+       				<argument>/home/david/git/samulan/src/main/resources/SentiData/Ancora-ES-SentiData</argument> 
+       				<argument>-r</argument>
+       				<argument>/home/david/git/samulan/src/main/resources/configuration_Ancora.xml</argument>
+      			</arguments>   
+            </configuration>
+        </plugin> -->
+
+        
+        <!-- Plugin to be able to create a runnable jar as a stand-alone application. -->
+      <plugin>
+		      <artifactId>maven-assembly-plugin</artifactId>
+		      <configuration>
+		        <descriptorRefs>
+		          <descriptorRef>jar-with-dependencies</descriptorRef>
+		        </descriptorRefs>
+		        <archive>
+		          <manifest>
+		            <mainClass>org.grupolys.samulan.Samulan</mainClass>
+		          </manifest>
+		        </archive>
+		      </configuration> 
+    	</plugin> 
+        
+    </plugins>
+   </build>
+  
+</project>

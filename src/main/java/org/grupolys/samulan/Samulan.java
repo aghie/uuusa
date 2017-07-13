@@ -1,0 +1,454 @@
+package org.grupolys.samulan;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.io.Writer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.grupolys.nlputils.parser.CoNLLReader;
+import org.grupolys.nlputils.parser.DependencyGraph;
+import org.grupolys.nlputils.parser.DependencyNode;
+import org.grupolys.samulan.analyser.AnalyserConfiguration;
+import org.grupolys.samulan.analyser.RuleBasedAnalyser;
+import org.grupolys.samulan.analyser.SyntacticRuleBasedAnalyser;
+import org.grupolys.samulan.analyser.sentimentjoiner.CompositeSentimentJoiner;
+import org.grupolys.samulan.analyser.sentimentjoiner.MaximumFromBranchSentimentJoiner;
+import org.grupolys.samulan.analyser.sentimentjoiner.NormaliserSentimentJoiner;
+import org.grupolys.samulan.analyser.sentimentjoiner.SentimentJoiner;
+import org.grupolys.samulan.processor.Processor;
+import org.grupolys.samulan.processor.parser.MaltParserWrapper;
+import org.grupolys.samulan.processor.tagger.MaxentStanfordTagger;
+import org.grupolys.samulan.processor.tokenizer.ARKTwokenizer;
+import org.grupolys.samulan.rule.RuleManager;
+import org.grupolys.samulan.util.Dictionary;
+import org.grupolys.samulan.util.SentimentDependencyGraph;
+import org.grupolys.samulan.util.SentimentDependencyNode;
+import org.grupolys.samulan.util.SentimentInformation;
+import org.grupolys.samulan.util.exceptions.SentimentJoinerNotFoundException;
+
+import net.sourceforge.argparse4j.ArgumentParsers;
+import net.sourceforge.argparse4j.impl.Arguments;
+import net.sourceforge.argparse4j.inf.ArgumentParser;
+import net.sourceforge.argparse4j.inf.ArgumentParserException;
+import net.sourceforge.argparse4j.inf.Namespace;
+
+public class Samulan {
+	
+	public static final String INPUT = "input";
+	public static final String OUTPUT = "output";
+	public static final String CONLL = "conll";
+	public static final String ENCODING = "encoding";
+	public static final String FILTERING = "filtering";
+	private static final String FILTERING_SENTISTRENGTH = "sentistrength";
+	public static final String RULES = "rules";
+	public static final String PROPERTIES = "properties";
+	public static final String SENTIDATA = "sentidata";
+	public static final String VERBOSE = "verbose";
+	public static final String SCALE = "scale";
+	public static final String TRINARY = "trinary";
+	public static final String BINARY = "binary";
+	public static final String SENTISTRENGTH = "sentistrength";
+	public static final String SEMANTIC_ORIENTATION = "so";
+	public static final String CONLL_IDENTIFIER_SYMBOL = "###";
+	public static final String MALTPARSER = "maltparser"; 
+	public static final String STANFORD_TAGGER_SUFFIX = ".tagger";
+	
+	public static void main(String[] args){
+
+		Namespace ns = parseCommand(args);
+		execute(ns);
+	}
+	
+	private static Namespace parseCommand(String[] args){
+		ArgumentParser ap = ArgumentParsers.newArgumentParser("Samulan").defaultHelp(true).description("Apply Sentiment Analysis to files");
+		ap.addArgument("-i","--"+INPUT).required(false).help("Path to the conll file to be analyzed");
+		ap.addArgument("-c","--"+CONLL).required(false).help("Path to a conll file containing the parsed files. "
+															+ "You must specify an identifier just above the first conll graph of your text (such as ### IDENTIFIER");
+		ap.addArgument("-s","--"+SENTIDATA).required(true).help("Path to the Sentidata directory");
+		ap.addArgument("-e","--"+ENCODING).setDefault("utf-8").help("Encoding of input data");
+		ap.addArgument("-f","--"+FILTERING).required(false).help("sentistrength to use SentiStrength output. Omit otherwise");
+		ap.addArgument("-r","--"+RULES).help("Path to the .xml file containing the rules");
+		ap.addArgument("-o","--"+OUTPUT).required(false).help("Path to the output file with the predictions");
+		ap.addArgument("-v","--"+VERBOSE).type(Boolean.class).setDefault(false).required(false).help("Print explanation");
+		ap.addArgument("-sc","--"+SCALE).setDefault(TRINARY).help("Selects the type of classification");
+		ap.addArgument("-p","--"+PROPERTIES).required(true).help("Path to the properties file");
+		Namespace ns = null;
+		
+		try {
+			
+			//TODO Improve command error checking
+			ns  = ap.parseArgs(args);
+
+			if (!rawFilesProvided(ns) && !parsedCoNLLFileProvided(ns)){
+				throw new ArgumentParserException(INPUT+" or "+CONLL+" parameter is required", ap);
+			}
+			
+			if (rawFilesProvided(ns) && parsedCoNLLFileProvided(ns)){
+				throw new ArgumentParserException(INPUT+" or "+CONLL+" cannot appear together required", ap);
+			}
+			
+			if (ns.get(FILTERING) != null && !ns.get(FILTERING).equals(FILTERING_SENTISTRENGTH)){
+				throw new ArgumentParserException(FILTERING+" not valid", ap);
+			}
+			
+			if (!ns.get(SCALE).equals(TRINARY) && !ns.get(SCALE).equals(SEMANTIC_ORIENTATION) && !ns.get(SCALE).equals(BINARY)){
+				throw new ArgumentParserException(SCALE+" is not a valid argument. Use: "+SEMANTIC_ORIENTATION+"|"+TRINARY+"|"+BINARY, ap);
+			}
+			
+		} catch (ArgumentParserException e) {
+			ap.handleError(e);
+			System.exit(1);
+		}
+		
+		return ns;
+	}
+	
+	private static boolean rawFilesProvided(Namespace ns){
+		return ns.getString(INPUT) != null;
+	}
+	
+	private static boolean parsedCoNLLFileProvided(Namespace ns){
+		return ns.getString(CONLL) != null;
+		
+	}
+	
+	
+	private static boolean sentiStrengthStyleOutput(String filteringParameter){
+		return filteringParameter != null && filteringParameter.equals(FILTERING_SENTISTRENGTH);
+	}
+	
+	//Obtains a list of SentimentDependencyGraph given a CoNLL file
+	private static List<SentimentDependencyGraph> getGraphs(String path, String encoding){
+		CoNLLReader conllReader = new CoNLLReader();
+		List<DependencyGraph> graphs =conllReader.read(path, encoding);
+		List<SentimentDependencyGraph> sgraphs = new ArrayList<SentimentDependencyGraph>();
+		
+		for (DependencyGraph dg: graphs){
+			
+			HashMap<Short, DependencyNode> nodes = dg.getNodes();
+			HashMap<Short, DependencyNode> snodes = new HashMap<Short, DependencyNode>();
+			for (short address: nodes.keySet()){
+				snodes.put(address,new SentimentDependencyNode(nodes.get(address), null));
+			}
+			
+			sgraphs.add(new SentimentDependencyGraph(snodes));
+		}
+		return sgraphs;
+	}
+	
+	
+	//Obtains the sentiment classification for each graph in a CoNLL file
+	private static void analyse(String conllFile, String encoding, RuleBasedAnalyser rba,
+								String pathOutput,String scale,boolean verbose){
+
+
+		BufferedReader br = null;
+		String line, conll = null, textID = null, previousTextID = null;
+		boolean newFileGraphs = false;
+		boolean first = true;
+		CoNLLReader conllReader = new CoNLLReader();
+		List<SentimentDependencyGraph> sdgs = new ArrayList<SentimentDependencyGraph>();
+		double totalAnalyseTime = 0, textAnalyseTime = 0 ;
+		try {
+			br = new BufferedReader(new FileReader(conllFile));
+		} catch (FileNotFoundException e1) {
+			System.err.println("File or directory: "+conllFile+" not found");
+			e1.printStackTrace();
+		}
+		
+		Writer writer = null;
+		try {
+			if (pathOutput != null)
+				writer = new PrintWriter(pathOutput, encoding);
+			else
+				writer = new BufferedWriter(new OutputStreamWriter(System.out));
+		} catch (FileNotFoundException | UnsupportedEncodingException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+			
+		try {
+			line = br.readLine();
+			while (line != null) {
+								
+				String[] ls = line.split("\t");
+	
+				
+				if (newFileGraphs && (previousTextID != null)){
+						
+					long initAnalyseTextTime = System.nanoTime();
+	
+					List<SentimentInformation> sis = sdgs.stream()
+															.map( (SentimentDependencyGraph dg) -> ( rba.analyse(dg, (short) 0)))
+															.collect(Collectors.toList());	 
+					long stopAnalyseTextTime = System.nanoTime();
+					String text = String.join(" ", 
+							sdgs.stream().map( (SentimentDependencyGraph dg) -> dg.subgraphToString((short) 0) ).collect(Collectors.toList()));
+					
+					SentimentInformation siFinal = rba.merge(sis);
+					try {
+						textAnalyseTime = (stopAnalyseTextTime-initAnalyseTextTime) / 1000000000.0;
+						totalAnalyseTime+=textAnalyseTime;
+						writer.write(previousTextID+"\t"+printOutputScaled(siFinal,scale, rba.getAc().isBinaryNeutralAsNegative())+"\t"+"\t"+text+"\t"+" [The analysis took: "+textAnalyseTime+" seg.] [Accumulated time is: "+totalAnalyseTime+"]\n");
+						writer.flush();
+						if (verbose){
+							sdgs.stream().forEach(sdg -> sdg.printLandscapeGraph((short) 0));
+						}
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+						
+					sdgs.clear();
+					previousTextID = null;
+					newFileGraphs = false;
+				}
+				
+				//We process the line	
+				if (line.startsWith(CONLL_IDENTIFIER_SYMBOL)){
+						String lcleaned = line.replace(CONLL_IDENTIFIER_SYMBOL, "").replace(" ", "").replace("\n", "");
+						if (!first){previousTextID = textID;}
+						first=false;
+						textID = lcleaned.split("\t")[1];
+						conll = "";
+						newFileGraphs = true;
+				}
+				//We are still reading conll graphs from the same text
+				else{
+						//We are reading a new conll graph, but from the same text
+						if (line.equals("")){	
+						
+							HashMap<Short, DependencyNode> nodes = conllReader.read(conll).getNodes();
+							HashMap<Short, DependencyNode> snodes = new HashMap<Short, DependencyNode>();
+							for (short address: nodes.keySet()){
+									snodes.put(address,new SentimentDependencyNode(nodes.get(address), null));
+								}	
+							sdgs.add(new SentimentDependencyGraph(snodes));
+	
+							conll = "";
+						}
+						else{
+							
+							conll = conll.concat(line+"\n");
+						}
+				}	
+				
+				line = br.readLine();		
+		}
+			
+		//Last graph
+		if (!sdgs.isEmpty()){
+			List<SentimentInformation> sis = sdgs.stream()
+					.map( (SentimentDependencyGraph dg) -> ( rba.analyse(dg, (short) 0)))
+					.collect(Collectors.toList());	  ; 
+			String text = String.join(" ", 
+			sdgs.stream().map( (SentimentDependencyGraph dg) -> dg.subgraphToString((short) 0) ).collect(Collectors.toList()));
+				
+			SentimentInformation siFinal = rba.merge(sis);
+			try {
+				writer.write(textID+"\t"+printOutputScaled(siFinal,scale,rba.getAc().isBinaryNeutralAsNegative())+"\t"+"\t"+text+"\t"+" [The analysis took: "+textAnalyseTime+" seg.] [Accumulated time is: "+totalAnalyseTime+"]\n");
+				writer.flush();
+				if (verbose){
+					sdgs.stream().forEach(sdg -> sdg.printLandscapeGraph((short) 0));
+				}
+				} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				}
+
+			sdgs.clear();
+			textID = null;
+			newFileGraphs = false;
+		}
+			
+		br.close();
+		writer.close();
+			
+		} catch (IOException e) {
+			e.printStackTrace();
+		} 
+		
+	}
+	
+	
+	//Classifies a SentimentInformation instance given a scale
+	private static String printOutputScaled(SentimentInformation si, String scale, boolean binaryNeutralAsNegative){
+		
+		if (scale.equals(SEMANTIC_ORIENTATION)){
+			return String.valueOf(si.getSemanticOrientation());
+		}
+		else if (scale.equals(SENTISTRENGTH)){
+			return si.getPositiveSentiment()+"\t"+si.getNegativeSentiment();
+		}
+		else if (scale.equals(TRINARY)){
+			
+			if (si.getPositiveSentiment() > si.getNegativeSentiment() || (si.getPositiveSentiment() == si.getNegativeSentiment() && si.getPositiveSentiment()>0) )
+				return "1";
+			else if (si.getSemanticOrientation() < 0)
+				return "-1";
+			else 
+				return "0";
+		}
+		else{	
+
+			if (si.getSemanticOrientation() > 0)
+				return "1";
+			else{
+				
+				if (si.getSemanticOrientation() != 0) return "-1";
+				
+				if (binaryNeutralAsNegative)
+					return "-1";	
+				else return "1";
+				}
+		}
+	
+	}
+	
+	
+	//Obtains the sentiment classification for line in a tsv file (it classifies new samples)
+	private static void analyse(String pathRawFiles, String encoding, Processor p, RuleBasedAnalyser rba,
+								  String pathOutput, String scale, boolean verbose){
+		
+		String id, category, text;
+		BufferedReader br = null;
+		
+		try {
+			br = new BufferedReader(new FileReader(pathRawFiles));
+		} catch (FileNotFoundException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		
+		StringBuilder sb = new StringBuilder();
+		String line;
+
+
+		Writer writer = null;
+		try {
+			if (pathOutput != null)
+				writer = new PrintWriter(pathOutput, encoding);
+			else
+				writer = new BufferedWriter(new OutputStreamWriter(System.out));
+		} catch (FileNotFoundException | UnsupportedEncodingException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+	
+		try {
+			line = br.readLine();
+			while (line != null) {
+				String[] ls = line.split("\t");
+				text = ls[ls.length-1];
+				List<SentimentDependencyGraph> sdgs = p.process(text);
+				List<SentimentInformation> sis = sdgs.stream()
+						.map( (SentimentDependencyGraph dg) -> ( rba.analyse(dg, (short) 0)))
+						.collect(Collectors.toList());
+			    
+			    SentimentInformation siFinal = rba.merge(sis);
+				writer.write(printOutputScaled(siFinal,scale,rba.getAc().isBinaryNeutralAsNegative())+"\t"+"\t"+text+"\n");
+				writer.flush();
+				if (verbose){
+					sdgs.stream().forEach(sdg -> sdg.printLandscapeGraph((short) 0));
+				}
+				line = br.readLine();
+			}
+			br.close();
+			writer.close();
+			
+		} catch (IOException e) {
+			e.printStackTrace();
+		} 
+	}
+	
+	
+	//Creates the pipeline for SAMULAN. Needed if the input is a raw file.
+	private static Processor configureProcessor(Namespace ns) throws FileNotFoundException{
+		ARKTwokenizer arktokenizer = new ARKTwokenizer();
+		
+		File folderSentiData = new File(ns.getString(SENTIDATA));
+		File[] files = folderSentiData.listFiles();
+		String pathStanfordTagger = null;
+		for (File f : files){
+			if (f.getAbsolutePath().endsWith(STANFORD_TAGGER_SUFFIX)){
+				pathStanfordTagger = f.getAbsolutePath();
+				break;
+			}
+		}
+		
+		if (pathStanfordTagger == null){
+			throw new FileNotFoundException(".tagger file not found in SentiData");
+		}
+		
+		MaxentStanfordTagger tagger = new MaxentStanfordTagger(pathStanfordTagger);
+		MaltParserWrapper parser = new MaltParserWrapper(ns.getString(SENTIDATA)+File.separator+MALTPARSER);
+		return new Processor(arktokenizer, tagger, parser);
+	}
+	
+
+	private static void execute(Namespace ns){
+		
+		Dictionary dictionary = new Dictionary();
+		RuleBasedAnalyser rba = null;
+		System.err.println("Current working dir: "+System.getProperty("user.dir"));
+		System.err.println("Path SENTIDATA: "+ns.getString(SENTIDATA));
+		System.err.println("Path RULES: "+ns.getString(RULES));
+		dictionary.readSentiData(ns.getString(SENTIDATA));
+		System.err.print("Generating rules... ");
+		AnalyserConfiguration configuration = null;
+		try {
+		configuration = new AnalyserConfiguration(ns.getString(PROPERTIES));
+		} catch (IOException | SentimentJoinerNotFoundException e) {
+			e.printStackTrace();
+		}
+		RuleManager rm = new RuleManager(dictionary);
+		rm.setAlwaysShift(configuration.isAlwaysShift());
+		rm.readRules(ns.getString(RULES));
+		System.err.println("done");
+		
+		
+
+		//NormaliserSentimentJoiner nsj = new NormaliserSentimentJoiner(5);
+		if (sentiStrengthStyleOutput(ns.get(FILTERING))){
+			System.err.println("ERROR: Filtering option "+ns.getString(FILTERING)+" not valid");
+			return;
+//			MaximumFromBranchSentimentJoiner msj = new MaximumFromBranchSentimentJoiner();
+//		//	NormaliserSentimentJoiner nsj = new NormaliserSentimentJoiner(5);
+//			CompositeSentimentJoiner csj = new CompositeSentimentJoiner(new ArrayList<SentimentJoiner>(Arrays.asList(nsj,msj)));
+//			//rba = new SyntacticRuleBasedAnalyser(new AnalyserConfiguration(),rm,csj);
+//			rba = new SyntacticRuleBasedAnalyser(new AnalyserConfiguration(),rm, csj);
+		}
+		else {
+				rba = new SyntacticRuleBasedAnalyser(configuration,rm);
+		}
+		
+		if (parsedCoNLLFileProvided(ns)){
+
+			analyse(ns.getString(CONLL),ns.getString(ENCODING),rba,
+					ns.getString(OUTPUT), ns.getString(SCALE), ns.getBoolean(VERBOSE));
+		}
+		else{
+			try {
+				analyse(ns.getString(INPUT),ns.getString(ENCODING), configureProcessor(ns), rba,
+						ns.getString(OUTPUT), ns.getString(SCALE), ns.getBoolean(VERBOSE));
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+	}
+}
