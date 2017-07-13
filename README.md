@@ -1,4 +1,4 @@
-# uuusa
+# UUUSA
 
 Java implementation of the formalism described in the article "Universal, Unsupervised (rule-based), Uncovered Sentiment Analysis"
 
@@ -31,7 +31,5 @@ Java 8
 
 Vilares, D., Gómez-Rodríguez, C., & Alonso, M. A. (2017). Universal, unsupervised (rule-based), uncovered sentiment analysis. Knowledge-Based Systems, 118, 45-55.
 
-# TODO
 
-Upload source code
 
