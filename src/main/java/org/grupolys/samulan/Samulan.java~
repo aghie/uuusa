@@ -401,9 +401,7 @@ public class Samulan {
 			}
 			br.close();
 			writer.close();
-      if (pathToSaveParsedFile != null){
 			conllWriter.close();
-      }
 			
 		} catch (IOException e) {
 			e.printStackTrace();

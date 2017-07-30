@@ -96,8 +96,7 @@ public class MaltParserWrapper implements ParserI {
 			//running dummy sentence to force MaltParser to load all its parameters
 			try {
 				this.parser = new MaltParserService();
-				String command = "-c "+modelName.replace(".mco", "")+" -m parse"+" -w \""+workingDir+"\" -lfi parser.log"+" "+options;//+" -lfi parser.log";
-				System.out.println(command);
+				String command = "-c "+modelName.replace(".mco", "")+" -m parse"+" -w "+workingDir+" -lfi parser.log"+" "+options;//+" -lfi parser.log";
 				this.parser.initializeParserModel(command);
 				String[] tokens = new String[11];
 				tokens[0] = "1\tGrundavdraget\t_\tN\tNN\tDD|SS";
