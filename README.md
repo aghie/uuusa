@@ -56,13 +56,13 @@ To train a tagger:
 
 Samulan supports models trained using the [Stanford-tagger](https://nlp.stanford.edu/software/tagger.shtml)
 
-Locate the trained model (.tagger) inside your PATH_TO_SENTIDATA_FOLDER/
+Locate the trained model (.tagger) inside your PATH_SENTIDATA/
 
 To train a parser:
 
 Samulan supports parsers trained using [Maltparser-1.7.1.](http://maltparser.org/)
 
-Locate the trained model (.mco) and the features xml inside the PATH_TO_SENTIDATA_FOLDER/maltparser/
+Locate the trained model (.mco) and the features xml inside the PATH_SENTIDATA/maltparser/
 
 
 
