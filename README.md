@@ -8,7 +8,7 @@ Java 8
 
 Maven (if you are compiling from source code)
 
-You also will need MaltParser and Stanford tagger if you plan to train a parser or a tagger to plug it into the system.
+You also will need [MaltParser](http://maltparser.org/) and the [Stanford tagger](https://nlp.stanford.edu/software/tagger.shtml) if you plan to train a parser or a tagger to plug it into the system.
 
 # Build the JAR
 
