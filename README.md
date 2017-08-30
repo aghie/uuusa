@@ -2,6 +2,14 @@
 
 A Java implementation of the formalism described in the article "Universal, Unsupervised (rule-based), Uncovered Sentiment Analysis"
 
+## Prerequisites 
+
+Java 8
+
+Maven (if you are compiling from source code)
+
+You also will need MaltParser and Stanford tagger if you plan to train a parser or a tagger to plug it into the system.
+
 # Build the JAR
 
 ## Building from source coude
@@ -10,7 +18,7 @@ A Java implementation of the formalism described in the article "Universal, Unsu
 	cd uuusa-master
 	mvn assembly:assembly
 
-If nothing goes wrong, you should see something like at the end of the log:
+If everything goes fine, you should see something like at the end of the log:
 
 	[INFO] ------------------------------------------------------------------------
 	[INFO] BUILD SUCCESS
@@ -40,6 +48,25 @@ Data/Resources used for our UUUSA model can be found [here](http://grupolys.org/
 
 Data/Resources used for our SISA (Syntactic Iberian Polarity classification) model can be found [here](http://grupolys.org/software/UUUSA/sisa-data.zip)
 
+### Obtaining a trained tagger or parser
+
+We only provided a small set of pretrained taggers and parsers. You might want to use your own. To do so, you must consider some things:
+
+To train a tagger:
+
+Samulan supports models trained using the [Stanford-tagger](https://nlp.stanford.edu/software/tagger.shtml)
+
+Locate the trained model (.tagger) inside your PATH_TO_SENTIDATA_FOLDER/
+
+To train a parser:
+
+Samulan supports parsers trained using [Maltparser-1.7.1.](http://maltparser.org/)
+
+Locate the trained model (.mco) and the features xml inside the PATH_TO_SENTIDATA_FOLDER/maltparser/
+
+
+
+
 ## Execute the JAR file
 
 
@@ -52,11 +79,20 @@ The input must be formatted as a tsv file, where the last column contains the te
 ### Over a CoNLL file
 java -Dfile.encoding=UTF-8 -jar -Xmx2g USA_JAR -s EN PATH_SENTIDATA -r PATH_OPERATIONS_XML -c PATH_PARSED_CONLL -p PATH_UUUSA_PROPERTIES_FILE -v [true|false]
 
-## Prerequisites 
+### Execution options
 
-Java 8
+	-i	Path to the raw file. Cannot be used together with -c and viceversa.
+	-c	Path to a CoNLL file containing the parsed files. You must specify an identifier above the first conll 	 graph of each text (### IDENTIFIER\n"). Check http://grupolys.org/software/UUUSA/en_parsed.conll for an example
+															 
+	-s	Path to the Sentidata directory. Check http://grupolys.org/software/UUUSA/EN-SentiData/ for an example.
+	-e	Encoding. Default utf-8
+	-r	Path to the .xml file containing the rules
+	-o	Path to the output file with the predictions
+	-v	VERBOSE. true|false
+	-sc	Selects the type of classification. trinary|binary|so
+	-p	Path to the properties file
+	-spf	Path to the file where the parsed sentences in CoNLL format will be saved. Useful if you plan to run many experiments. Added in version 0.1.1.
 
-Maven (if you are compiling from source code)
 
 # References
 
