@@ -31,9 +31,7 @@ Take the file samulan-0.1.1-jar-with-dependencies.jar to execute uuusa as a stan
 
 We provide some versions of UUUSA, already as JAR's, so you do not need to build them:
 
-[samulan 0.1.0.jar](http://grupolys.org/software/UUUSA/samulan-0.1.0.jar) 
-
-This version is the system as used in Vilares et al. (2017a). Related data and resources used can be also found in our local repository: http://grupolys.org/software/UUUSA/samulan-0.1.0.jar
+[samulan 0.1.0.jar](http://grupolys.org/software/UUUSA/samulan-0.1.0.jar) This version is the system as used in Vilares et al. (2017a). Related data and resources used can be also found in our local repository: http://grupolys.org/software/UUUSA/samulan-0.1.0.jar
 
 
 ## Data
