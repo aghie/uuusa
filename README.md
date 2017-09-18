@@ -28,7 +28,7 @@ If everything goes fine, you should see something like at the end of the log:
 	[INFO] Final Memory: 58M/1028M
 	[INFO] ------------------------------------------------------------------------
 
-This will create a folder /target inside uuusa-master. Inside it you should see two .jars:
+This will create a folder /target inside uuusa-master. Inside you should see two .jar files:
 	
 	samulan-0.1.1.jar
 	samulan-0.1.1-jar-with-dependencies.jar
